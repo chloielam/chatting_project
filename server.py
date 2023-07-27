@@ -2,6 +2,9 @@
 import socket
 import threading
 
+# CLIENT[NICKNAME] = [SOCKET, ADDRESS]
+CLIENTS = dict()
+
 # create a socket object
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -12,59 +15,64 @@ port = 9999
 # bind to the port
 server.bind((host, port))
 
-# queue up to 5 requests
-server.listen(5)
+# listen for clients
+server.listen()
 
-# list of clients
-clients = []
+# broadcast messages to all clients
 
-# list of nicknames
-nicknames = []
 
-# broadcast message to all clients
-def broadcast(message,sender=None):
-    for client in clients:
-        if client != sender:
-            client.send(message)
-    print(message.decode('ascii'))
-# handle messages from clients
-def handle(client):
+def broadcast(message, sender=None):
+    for client_socket, address in CLIENTS.values():
+        # do not send message to sender
+        if client_socket != sender:
+            client_socket.send(message)
+
+
+# handle client messages
+def handle(client_socket, nickname):
     while True:
         try:
-            # broadcast message
-            message = client.recv(1024)
-            broadcast(message,client)
+            # receive message from client
+            message = client_socket.recv(1024)
+            # broadcast message to all clients
+            broadcast(message, client_socket)
         except:
-            # remove and close client
-            index = clients.index(client)
-            clients.remove(client)
-            client.close()
-            nickname = nicknames[index]
-            broadcast(f'{nickname} left the chat!'.encode('ascii'))
-            nicknames.remove(nickname)
+            # remove client from CLIENTS
+            del CLIENTS[nickname]
+            # broadcast message to all clients
+            broadcast(f'{nickname} left the chatroom!'.encode(
+                'ascii'))
             break
-# receive and broadcast messages
-def receive():
+
+# handle new connections
+
+
+def on_connect(client_socket, address):
+    # request and store nickname
+    nickname = client_socket.recv(1024).decode('ascii')
+    while nickname in CLIENTS:
+        client_socket.send('RESEND_NICK'.encode('ascii'))
+        nickname = client_socket.recv(1024).decode('ascii')
+    # store client information
+    CLIENTS[nickname] = (client_socket, address)
+    # broadcast message to all clients
+    broadcast(f'{nickname} joined the chatroom!'.encode(
+        'ascii'))
+    # start thread for handling client
+    thread = threading.Thread(target=handle, args=(client_socket, nickname))
+    thread.start()
+
+
+# start accepting clients
+def accept():
     while True:
-        # accept connection
-        client, address = server.accept()
+        client_socket, address = server.accept()
         print(f'Connected with {str(address)}')
-
-        # request and store nickname
-        client.send('NICK'.encode('ascii'))
-        nickname = client.recv(1024).decode('ascii')
-        nicknames.append(nickname)
-        clients.append(client)
-
-        # print and broadcast nickname
-        broadcast(f'{nickname} joined the chat!'.encode('ascii'))
-        client.send('Connected to the server!\n'.encode('ascii'))
-        # start handling thread for client
-        thread = threading.Thread(target=handle, args=(client,))
+        thread = threading.Thread(
+            target=on_connect, args=(client_socket, address))
         thread.start()
-        
-receive()
 
 
-
-
+if __name__ == '__main__':
+    print('Server starts listening...')
+    accept()

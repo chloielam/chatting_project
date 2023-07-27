@@ -11,25 +11,16 @@ port = 9999
 # connect to the server
 client.connect((host, port))
 
+
 # receive messages from server
 def receive():
     while True:
-        try:
-            # receive message from server
-            # if 'NICK' send nickname
-            message = client.recv(1024).decode('ascii')
-            if message == 'NICK':
-                client.send(nickname.encode('ascii'))
-            else:
-                print(message)
-        except:
-            # close connection when error
-            print('An error occured!')
-            client.close()
-            break
+        message = client.recv(1024).decode('ascii')
+        print(message)
+
 
 # send messages to server
-def write():
+def write(nickname):
     while True:
         message = f'{nickname}: {input("")}'
         client.send(message.encode('ascii'))
@@ -37,9 +28,16 @@ def write():
 
 # request and store nickname
 nickname = input('Choose your nickname: ')
+client.send(nickname.encode('ascii'))
+message = client.recv(1024).decode('ascii')
+while message == 'RESEND_NICK':
+    nickname = input('Nickname already in use. Choose another: ')
+    client.send(nickname.encode('ascii'))
+    message = client.recv(1024).decode('ascii')
+
 
 # start threads for listening and writing
 receive_thread = threading.Thread(target=receive)
 receive_thread.start()
-write_thread = threading.Thread(target=write)
+write_thread = threading.Thread(target=write, args=(nickname,))
 write_thread.start()
