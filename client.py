@@ -15,25 +15,25 @@ client.connect((host, port))
 # receive messages from server
 def receive():
     while True:
-        message = client.recv(1024).decode('ascii')
+        message = client.recv(1024).decode('utf-8')
         print(message)
 
 
 # send messages to server
 def write(nickname):
     while True:
-        message = f'{nickname}: {input("")}'
-        client.send(message.encode('ascii'))
+        message = input("")
+        client.send(message.encode('utf-8'))
 
 
 # request and store nickname
 nickname = input('Choose your nickname: ')
-client.send(nickname.encode('ascii'))
-message = client.recv(1024).decode('ascii')
+client.send(nickname.encode('utf-8'))
+message = client.recv(1024).decode('utf-8')
 while message == 'RESEND_NICK':
     nickname = input('Nickname already in use. Choose another: ')
-    client.send(nickname.encode('ascii'))
-    message = client.recv(1024).decode('ascii')
+    client.send(nickname.encode('utf-8'))
+    message = client.recv(1024).decode('utf-8')
 
 
 # start threads for listening and writing
