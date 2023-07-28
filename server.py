@@ -13,6 +13,7 @@ host = socket.gethostname()
 port = 9999
 
 # bind to the port
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind((host, port))
 
 # listen for clients
@@ -55,7 +56,7 @@ def broadcast(message, nickname, sender=None):
     else:
         for client_socket, address in CLIENTS.values():
             if client_socket is not sender:
-                client_socket.send(f'{nickname}:'.encode('utf-8') + message)
+                client_socket.send(f'{nickname}: '.encode('utf-8') + message)
 
 # handle client messages
 
@@ -111,5 +112,30 @@ def accept():
 
 
 if __name__ == '__main__':
-    print('Server starts listening...')
+    import tkinter as tk
+    from tkinter import messagebox
+    import sys
+    root = tk.Tk()
+    def on_closing():
+        if messagebox.askokcancel("Quit", "Do you want to quit?"):
+            root.destroy()
+            server.close()
+            sys.exit()
+
+    root.protocol("WM_DELETE_WINDOW", on_closing)
+
+    # Set the window's position
+    root.geometry(f"{300}x{100}+{(root.winfo_screenwidth() - 300) // 2}+{(root.winfo_screenheight() - 100) // 2}")
+    #set the title
+    root.title("SERVER IS ONLINE!")
+    
+    #display host and port on tkinter windows (centered)
+    tk.Label(root, text=f"HOST: {host}").pack(pady=10)
+    tk.Label(root, text=f"PORT: {port}").pack(pady=10)
+
+    root.mainloop()
+
     accept()
+
+
+    
