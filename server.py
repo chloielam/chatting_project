@@ -104,12 +104,14 @@ def on_connect(client_socket, address):
 # start accepting clients
 def accept():
     while True:
-        client_socket, address = server.accept()
-        print(f'Connected with {str(address)}')
-        thread = threading.Thread(
-            target=on_connect, args=(client_socket, address))
-        thread.start()
-
+        try:
+            client_socket, address = server.accept()
+            print(f'Connected with {str(address)}')
+            thread = threading.Thread(
+                target=on_connect, args=(client_socket, address))
+            thread.start()
+        except:
+            break
 
 if __name__ == '__main__':
     import tkinter as tk
@@ -120,7 +122,7 @@ if __name__ == '__main__':
         if messagebox.askokcancel("Quit", "Do you want to quit?"):
             root.destroy()
             server.close()
-            sys.exit()
+            sys.exit(0)
 
     root.protocol("WM_DELETE_WINDOW", on_closing)
 
@@ -132,10 +134,11 @@ if __name__ == '__main__':
     #display host and port on tkinter windows (centered)
     tk.Label(root, text=f"HOST: {host}").pack(pady=10)
     tk.Label(root, text=f"PORT: {port}").pack(pady=10)
-
+    
+    #start accepting clients
+    accept_thread = threading.Thread(target=accept)
+    accept_thread.start()
     root.mainloop()
-
-    accept()
 
 
     
