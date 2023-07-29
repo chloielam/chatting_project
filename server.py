@@ -1,9 +1,9 @@
-# build a chat server using socket programming
 import socket
 import threading
+from sortedcontainers import SortedDict
 
 # CLIENT[NICKNAME] = [SOCKET, ADDRESS]
-CLIENTS = dict()
+CLIENTS = SortedDict()
 
 # create a socket object
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
