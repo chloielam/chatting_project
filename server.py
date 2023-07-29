@@ -43,13 +43,14 @@ def private_message(client_socket, nickname, message):
     message = message.split(" ", 2)
     if len(message) < 3:
         client_socket.send(
-            'Invalid command. Please try again.'.encode('utf-8'))
+            '————> Invalid command. Please try again.'.encode('utf-8'))
         return
     if message[1] not in CLIENTS:
-        client_socket.send('User not found. Please try again.'.encode('utf-8'))
+        client_socket.send(
+            '————> User not found. Please try again.'.encode('utf-8'))
         return
     send_to_client(CLIENTS[message[1]][0],
-                   f'Private [{nickname}]: {message[2]}')
+                   f'[Private from {nickname}]: {message[2]}')
 
 
 def send_to_client(client_socket, message):

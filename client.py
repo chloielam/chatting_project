@@ -265,16 +265,11 @@ class NameFormGUI(QWidget):
 
 
 class ChatRoom(object):
-    component = []
 
     def setupUi(self, Widget):
         if not Widget.objectName():
             Widget.setObjectName(u"Widget")
         Widget.resize(800, 600)
-        self.plainTextEdit = QPlainTextEdit(Widget)
-        self.plainTextEdit.setObjectName(u"plainTextEdit")
-        self.plainTextEdit.setGeometry(QRect(10, 530, 650, 50))
-        ChatRoom.component.append(self.plainTextEdit)
 
         self.textBrowser = QTextBrowser(Widget)
         self.textBrowser.setObjectName(u"textBrowser")
@@ -286,7 +281,10 @@ class ChatRoom(object):
         self.textBrowser.setStyleSheet(
             u"border: 1px solid gray; text-indent: 10px; line-height: 1.2;")
 
-        ChatRoom.component.append(self.textBrowser)
+        self.plainTextEdit = QPlainTextEdit(Widget)
+        self.plainTextEdit.setObjectName(u"plainTextEdit")
+        self.plainTextEdit.setGeometry(QRect(10, 530, 650, 50))
+        self.plainTextEdit.setFont(font)
 
         self.scrollArea = QScrollArea(Widget)
         self.scrollArea.setObjectName(u"scrollArea")
@@ -297,7 +295,6 @@ class ChatRoom(object):
             u"scrollAreaWidgetContents")
         self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 120, 500))
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
-        ChatRoom.component.append(self.scrollArea)
 
         # LIST OF USERS
         self.scrollAreaWidgetContents = QWidget()
@@ -305,20 +302,18 @@ class ChatRoom(object):
             u"scrollAreaWidgetContents")
         self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 120, 500))
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
-        ChatRoom.component.append(self.scrollAreaWidgetContents)
 
         # SEND BUTTON
         self.pushButton = QPushButton(Widget)
         self.pushButton.setObjectName(u"pushButton")
         self.pushButton.setGeometry(QRect(680, 540, 80, 35))
-        ChatRoom.component.append(self.pushButton)
 
         self.retranslateUi(Widget)
         QMetaObject.connectSlotsByName(Widget)
 
     def retranslateUi(self, Widget):
         Widget.setWindowTitle(
-            QCoreApplication.translate("Widget", u"Widget", None))
+            QCoreApplication.translate("Widget", u"LAN Chatter", None))
         self.pushButton.setText(
             QCoreApplication.translate("Widget", u"Send", None))
         # restrict resizing windows
@@ -326,6 +321,18 @@ class ChatRoom(object):
 
 
 class ChatRoomGUI(QWidget):
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.ui = ChatRoom()
+        self.ui.setupUi(self)
+        self.ui.pushButton.clicked.connect(self.send_message)
+        self.ui.plainTextEdit.setFocus()
+        self.ui.plainTextEdit.installEventFilter(self)
+        self.ui.plainTextEdit.textChanged.connect(
+            lambda: self.ui.pushButton.setEnabled(len(self.ui.plainTextEdit.toPlainText()) > 0 and self.ui.plainTextEdit.isEnabled()))
+        self.ui.pushButton.setEnabled(False)
+
     def eventFilter(self, watched: QObject, event: any) -> bool:
         if watched == self.ui.plainTextEdit:
             # if single Enter key is pressed, send message
@@ -340,21 +347,28 @@ class ChatRoomGUI(QWidget):
         return super().eventFilter(watched, event)
 
     def send_message(self) -> None:
-        message = self.ui.plainTextEdit.toPlainText()
-        client.send(message.encode('utf-8'))
-        self.ui.textBrowser.append("You: " + message)
-        self.ui.plainTextEdit.clear()
-
-    def __init__(self, parent=None) -> None:
-        super().__init__(parent)
-        self.ui = ChatRoom()
-        self.ui.setupUi(self)
-        self.ui.pushButton.clicked.connect(self.send_message)
-        self.ui.plainTextEdit.setFocus()
-        self.ui.plainTextEdit.installEventFilter(self)
-        self.ui.plainTextEdit.textChanged.connect(
-            lambda: self.ui.pushButton.setEnabled(len(self.ui.plainTextEdit.toPlainText()) > 0 and self.ui.plainTextEdit.isEnabled()))
-        self.ui.pushButton.setEnabled(False)
+        try:
+            message = self.ui.plainTextEdit.toPlainText()
+            if message.startswith(('/private')):
+                if len(message.split()) < 3:
+                    self.ui.textBrowser.append(
+                        "Usage: /private <username> <message>")
+                    self.ui.plainTextEdit.clear()
+                    return
+                _, send_to, content = message.split(" ", 2)
+                self.ui.textBrowser.append(
+                    "You to " + send_to + ": " + content)
+                client.send(message.encode('utf-8'))
+                self.ui.plainTextEdit.clear()
+                return
+            client.send(message.encode('utf-8'))
+            self.ui.textBrowser.append("You: " + message)
+            self.ui.plainTextEdit.clear()
+        except:
+            ctypes.windll.user32.MessageBoxW(
+                0, "Server is down!", "Error", 0)
+            client.close()
+            sys.exit(0)
 
     def start_room(self) -> None:
         self.show()
@@ -374,7 +388,7 @@ def receive():
             chat_room.ui.textBrowser.append(message)
         except:
             client.close()
-            break
+            sys.exit(0)
 
 
 # ------------------------------------------------------Global Variables-------------------------------------------------------
