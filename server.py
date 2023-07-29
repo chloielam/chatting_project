@@ -28,9 +28,9 @@ server.listen()
 
 def welcome(client_socket):
     send_to_client(
-        client_socket, ' ----------------Welcome to the chatroom!----------------\n')
+        client_socket, ' -----------------------------   Welcome to the chatroom!   ------------------------------\n')
     send_to_client(
-        client_socket, ' ----------------Type /help for more info----------------\n')
+        client_socket, ' -------------------------------   Type /help for more info   -------------------------------\n')
     # broadcast('Existing clients: '.encode('utf-8'), "SERVER")
     # for nickname in CLIENTS:
     #     client_socket.send((nickname+" ").encode('utf-8'))
@@ -63,8 +63,8 @@ def broadcast(message, nickname, sender=None):
     # notification message
     if sender is None:
         # format message to --- message --- that does not exceed 60 characters
-        notification = (69-len(message))//2 * '-' + \
-            message + (69-len(message))//2 * '-' + '\n'
+        notification = (79-len(message))//2 * '-'  \
+            + ' '*6 + message + ' '*6 + (79-len(message))//2 * '-' + '\n'
         notification = notification.encode('utf-8')
         for client_socket, address in CLIENTS.values():
             client_socket.send(notification)

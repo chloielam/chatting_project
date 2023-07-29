@@ -285,6 +285,7 @@ class ChatRoom(object):
         self.textBrowser.setFont(font)
         self.textBrowser.setStyleSheet(
             u"border: 1px solid gray; text-indent: 10px; line-height: 1.2;")
+
         ChatRoom.component.append(self.textBrowser)
 
         self.scrollArea = QScrollArea(Widget)
@@ -323,14 +324,6 @@ class ChatRoom(object):
         # restrict resizing windows
         Widget.setFixedSize(Widget.size())
 
-    def set_state(self, state: bool) -> None:
-        for component in ChatRoom.component:
-            component.setEnabled(state)
-        # disable send button if there is no text and plainTextEdit is enabled
-        self.plainTextEdit.textChanged.connect(
-            lambda: self.pushButton.setEnabled(len(self.plainTextEdit.toPlainText()) > 0 and self.plainTextEdit.isEnabled()))
-        self.pushButton.setEnabled(False)
-
 
 class ChatRoomGUI(QWidget):
     def eventFilter(self, watched: QObject, event: any) -> bool:
@@ -359,14 +352,16 @@ class ChatRoomGUI(QWidget):
         self.ui.pushButton.clicked.connect(self.send_message)
         self.ui.plainTextEdit.setFocus()
         self.ui.plainTextEdit.installEventFilter(self)
+        self.ui.plainTextEdit.textChanged.connect(
+            lambda: self.ui.pushButton.setEnabled(len(self.ui.plainTextEdit.toPlainText()) > 0 and self.ui.plainTextEdit.isEnabled()))
+        self.ui.pushButton.setEnabled(False)
 
     def start_room(self) -> None:
-        self.ui.set_state(True)
         self.show()
         receive_thread = threading.Thread(target=receive)
         receive_thread.start()
         app.aboutToQuit.connect(lambda: client.close())
-        
+
 
 # ---------------------------------------------------TCP Socket Programming----------------------------------------------------
 
