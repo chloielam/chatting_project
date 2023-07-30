@@ -126,6 +126,10 @@ class ConnectFormGUI(QWidget):
         # restrict resizing windows
         self.setFixedSize(self.size())
 
+        # testing purpose
+        self.ui.host_input.setText("Z-DESKTOP")
+        self.ui.port_input.setText("9999")
+
     def connect(self):
         try:
             client.connect((self.ui.host_input.text(),
@@ -234,7 +238,7 @@ class NameFormGUI(QWidget):
     def validate_nickname(self) -> bool:
 
         valid_pattern = re.compile(
-            r'^(?=.{2,16}$)(?![_.\s])(?!.*[_.]{2})(?!.*[\s]{2})[\w0-9_\s]+(?<![_.\s])$')
+            r'^(?=.{2,16}$)(?![_.\s])(?!.*[_.]{2})(?!.*[\s]{2})[\w\s]+(?<![_.\s])$')
     # username is 2-16 characters long
     # no _ or . or whitespace at the beginning
     # no __ or _. or ._ or .. or double whitespace inside
@@ -332,6 +336,7 @@ class ChatRoomGUI(QWidget):
         self.ui.plainTextEdit.textChanged.connect(
             lambda: self.ui.pushButton.setEnabled(len(self.ui.plainTextEdit.toPlainText()) > 0 and self.ui.plainTextEdit.isEnabled()))
         self.ui.pushButton.setEnabled(False)
+        self.ui.textBrowser.setReadOnly(True)
 
     def eventFilter(self, watched: QObject, event: any) -> bool:
         if watched == self.ui.plainTextEdit:
@@ -346,53 +351,95 @@ class ChatRoomGUI(QWidget):
                     return True
         return super().eventFilter(watched, event)
 
-    def send_message(self) -> None:
-        try:
-            message = self.ui.plainTextEdit.toPlainText()
-            if message.startswith(('/private')):
-                if len(message.split()) < 3:
-                    self.ui.textBrowser.append(
-                        "Usage: /private <username> <message>")
+    def __send_message(self, message: str) -> None:
+        if re.compile(r'^\s*/help\s*$').match(message):
+            self.ui.textBrowser.append(
+                "-----------------------------   List of commands   -----------------------------\n")
+            self.ui.textBrowser.append(
+                "/help: List of commands\n")
+            self.ui.textBrowser.append(
+                "/private (<username>) <message>: Send private message to a user\n")
+            self.ui.textBrowser.append(
+                "/quit: Leave the chatroom\n")
+            self.ui.textBrowser.append(
+                "/list: List of online users\n")
+            self.ui.textBrowser.append(
+                "/clear: Clear the chat history\n")
+            self.ui.textBrowser.append(
+                "--------------------------------------------------------------------------------\n")
+            self.ui.plainTextEdit.clear()
+            return
+        if re.compile(r'^\s*/quit\s*$').match(message):
+            self.ui.textBrowser.append(
+                "---------------------------   You have left the chatroom!   ---------------------------\n")
+            self.ui.pushButton.setEnabled(False)
+            client.close()
+        if re.compile(r'^\s*/list\s*$').match(message):
+            self.ui.plainTextEdit.clear()
+            return
+        if re.compile(r'^\s*/clear\s*$').match(message):
+            self.ui.textBrowser.clear()
+            self.ui.plainTextEdit.clear()
+            return
+        if re.compile(r'^\s*/private.*$').match(message):
+            valid_private_pattern = re.compile(
+                r"^[\n\s]*(/private)\s+(\(.{2,16}\))\s+(.+)$")
+            if valid_private_pattern.match(message):
+                _, receiver, content = valid_private_pattern.match(
+                    message).groups()
+                if content.strip() == "":
                     self.ui.plainTextEdit.clear()
+                    self.ui.textBrowser.append(
+                        "---- Warning: Cannot send empty message!\n")
                     return
-                _, send_to, content = message.split(" ", 2)
+                client.send(
+                    f"/private {receiver} {content.strip()}".encode('utf-8'))
                 self.ui.textBrowser.append(
-                    "You to " + send_to + ": " + content)
-                client.send(message.encode('utf-8'))
+                    f"You to {receiver[1:-1]}: {content.strip()}")
                 self.ui.plainTextEdit.clear()
                 return
-            client.send(message.encode('utf-8'))
-            self.ui.textBrowser.append("You: " + message)
-            self.ui.plainTextEdit.clear()
+            else:
+                self.ui.plainTextEdit.clear()
+                self.ui.textBrowser.append(
+                    "---- Usage: /private (<username>) <message>\n")
+                return
+        client.send(message.encode('utf-8'))
+        self.ui.textBrowser.append("You: " + message)
+        self.ui.plainTextEdit.clear()
+
+    def send_message(self) -> None:
+        try:
+            self.__send_message(self.ui.plainTextEdit.toPlainText())
         except:
-            ctypes.windll.user32.MessageBoxW(
-                0, "Server is down!", "Error", 0)
+            self.ui.textBrowser.append(
+                "---------------------------   Cannot connect to the server!  ---------------------------\n")
+            self.ui.pushButton.setEnabled(False)
             client.close()
-            sys.exit(0)
 
     def start_room(self) -> None:
-        self.show()
         receive_thread = threading.Thread(target=receive)
         receive_thread.start()
-        app.aboutToQuit.connect(lambda: client.close())
+        self.show()
 
 
 # ---------------------------------------------------TCP Socket Programming----------------------------------------------------
 
 
 # receive messages from server
-def receive():
+def receive() -> None:
     while True:
         try:
             message = client.recv(1024).decode('utf-8')
             chat_room.ui.textBrowser.append(message)
         except:
+            chat_room.ui.textBrowser.append(
+                "---------------------------   Cannot connect to the server!  ---------------------------\n")
+            chat_room.ui.pushButton.setEnabled(False)
             client.close()
-            sys.exit(0)
+            break
 
 
 # ------------------------------------------------------Global Variables-------------------------------------------------------
-
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 app = QApplication(sys.argv)
 login = ConnectFormGUI()

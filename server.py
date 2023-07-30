@@ -1,8 +1,10 @@
 import socket
 import threading
+import ctypes
 from sortedcontainers import SortedDict
-
+import re
 # CLIENT[NICKNAME] = [SOCKET, ADDRESS]
+# {bytes: [socket.socket, (str, int)]}
 CLIENTS = SortedDict()
 
 # create a socket object
@@ -19,38 +21,33 @@ port = 9999
 try:
     server.bind((host, port))
 except:
-    exit(0)
+    ctypes.windll.user32.MessageBoxW(
+        0, "Another instance of the server is already running!", "Error", 1)
+    sys.exit(0)
 # listen for clients
 server.listen()
 
 # send welcome message to new client
 
 
-def welcome(client_socket):
+def welcome(client_socket) -> None:
     send_to_client(
-        client_socket, ' -----------------------------   Welcome to the chatroom!   ------------------------------\n')
+        client_socket, '                              ------   Welcome to the chatroom!   ------                             \n')
     send_to_client(
-        client_socket, ' -------------------------------   Type /help for more info   -------------------------------\n')
-    # broadcast('Existing clients: '.encode('utf-8'), "SERVER")
-    # for nickname in CLIENTS:
-    #     client_socket.send((nickname+" ").encode('utf-8'))
-
-# send private message to a client
+        client_socket, '                                ------   Type /help for more info.   ------                             \n')
 
 
-def private_message(client_socket, nickname, message):
-    message = message.decode('utf-8')
-    message = message.split(" ", 2)
-    if len(message) < 3:
-        client_socket.send(
-            '————> Invalid command. Please try again.'.encode('utf-8'))
-        return
-    if message[1] not in CLIENTS:
+def private_message(client_socket, nickname, message) -> None:
+    structure = re.compile(r'^(/private)\s(\(.{2,16}\))\s(.+)$')
+    _, receiver, text = structure.match(message.decode('utf-8')).groups()
+    lookup_nickname = receiver[1:-1].encode('utf-8')
+    if lookup_nickname not in CLIENTS:
         client_socket.send(
             '————> User not found. Please try again.'.encode('utf-8'))
         return
-    send_to_client(CLIENTS[message[1]][0],
-                   f'[Private from {nickname}]: {message[2]}')
+    display_nickname = nickname.decode('utf-8')
+    send_to_client(CLIENTS[lookup_nickname][0],
+                   f'[Private from {display_nickname}]: {text}')
 
 
 def send_to_client(client_socket, message):
@@ -60,24 +57,26 @@ def send_to_client(client_socket, message):
 # broadcast messages to all clients
 
 
-def broadcast(message, nickname, sender=None):
+def broadcast(message, nickname, sender=None) -> None:
     # notification message
-    if sender is None:
-        # format message to --- message --- that does not exceed 60 characters
-        notification = (79-len(message))//2 * '-'  \
-            + ' '*6 + message + ' '*6 + (79-len(message))//2 * '-' + '\n'
+    if sender is None or nickname == "SERVER":
+        notification = (85-len(message))//2 * ' '  \
+            + '-'*6 + "   " + message + "   " + '-' * \
+            6 + (85-len(message))//2 * ' '+'\n'
         notification = notification.encode('utf-8')
         for client_socket, address in CLIENTS.values():
             client_socket.send(notification)
     else:
         for client_socket, address in CLIENTS.values():
             if client_socket is not sender:
-                client_socket.send(f'[{nickname}]: '.encode('utf-8') + message)
+                display_nickname = nickname.decode('utf-8')
+                client_socket.send(
+                    f'[{display_nickname}]: '.encode('utf-8') + message)
 
 # handle client messages
 
 
-def handle(client_socket, nickname):
+def handle(client_socket, nickname) -> None:
     while True:
         try:
             # receive message from client
@@ -86,7 +85,7 @@ def handle(client_socket, nickname):
             if message.startswith((b'/private')):
                 private_message(client_socket, nickname, message)
                 continue
-            # public message
+            # public message- broadcast to all clients
             broadcast(message, nickname, client_socket)
         except:
             # remove client from CLIENTS
@@ -99,35 +98,36 @@ def handle(client_socket, nickname):
 # handle new connections
 
 
-def on_connect(client_socket, address):
+def on_connect(client_socket, address: tuple) -> None:
     # request and store nickname
     try:
-        nickname = client_socket.recv(1024).decode('utf-8')
+        storing_nickname = client_socket.recv(1024)  # bytes
+        display_nickname = storing_nickname.decode('utf-8')  # string
 
         # check if nickname is already taken
-        while nickname in CLIENTS:
+        while storing_nickname in CLIENTS:
             client_socket.send(
                 'RESEND_NICK'.encode('utf-8'))
-            nickname = client_socket.recv(1024).decode('utf-8')
+            storing_nickname = client_socket.recv(1024)
+            display_nickname = storing_nickname.decode('utf-8')
 
         # store client information
-        CLIENTS[nickname] = (client_socket, address)
+        CLIENTS[storing_nickname] = (client_socket, address)
         # notify to all clients
-        broadcast(f'{nickname} joined the chatroom!', "SERVER")
+        broadcast(f'{display_nickname} joined the chatroom!', "SERVER")
         # welcome new client
         welcome(client_socket)
         # start thread for handling client
         thread = threading.Thread(
-            target=handle, args=(client_socket, nickname))
+            target=handle, args=(client_socket, storing_nickname))
         thread.start()
     except:
-        client_socket.close()
         return
 
 # start accepting clients
 
 
-def accept():
+def accept() -> None:
     while True:
         try:
             client_socket, address = server.accept()
@@ -158,7 +158,7 @@ if __name__ == '__main__':
         f"{300}x{100}+{(root.winfo_screenwidth() - 300) // 2}+{(root.winfo_screenheight() - 100) // 2}")
     # set the title
     root.title("SERVER IS ONLINE!")
-
+    root.resizable(False, False)
     # display host and port on tkinter windows (centered)
     tk.Label(root, text=f"HOST: {host}").pack(pady=10)
     tk.Label(root, text=f"PORT: {port}").pack(pady=10)
