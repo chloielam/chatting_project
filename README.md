@@ -7,6 +7,11 @@ in terminal:
 python server.py
 python client.py
 
-in chat:
-/private [user name] + msg 
+chat commands:
+/help
+/list
+/clear
+/private (<username>) <message>
+/quit
+
 
