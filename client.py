@@ -450,9 +450,6 @@ class ChatRoomGUI(QWidget):
             self.ui.user_list.addItem(item)
         else:
             self.ui.user_list.clear()
-            item = QListWidgetItem(user_name.decode('utf-8') + " (You)")
-            item.setFont(self.font)
-            self.ui.user_list.addItem(item)
             for user in online_users:
                 item = QListWidgetItem(
                     user.decode('utf-8') if user != user_name else user.decode('utf-8') + " (You)")
@@ -484,8 +481,8 @@ def send_to_server(message: str) -> None:
             message_list.append(message[:1024])
             message = message[1024:]
         message_list.append(message + (1024-len(message))*'\x00')
-        if message_list[-1] == 1024 * '\x00':
-            message_list.pop()
+        if len(message):
+            message_list.append(message + (1024-len(message))*'\x00')
         for message in message_list:
             client_socket.send(message.encode('utf-8'))
 
@@ -494,32 +491,33 @@ def receive() -> None:
     update_pattern = re.compile(rb'\x00+UPDATE \((.+)\)\x00*')
     remove_pattern = re.compile(rb'\x00+REMOVE \((.+)\)\x00*')
     null_pattern = re.compile(rb'\x00+')
+    null_text_pattern = re.compile(r'^\[.*?\]:[\s\x00]+$')
     while True:
-        # try:
-        message = client_socket.recv(1024)
-        if null_pattern.match(message):
-            continue
-        if update_pattern.match(message):
-            new_user = update_pattern.match(message).group(1)
-            print(new_user)
-            print(new_user.decode('utf-8'))
-            online_users.add(new_user)
-            chat_room.update_user_list(update=new_user)
-            continue
-        if remove_pattern.match(message):
-            remove_user = remove_pattern.match(message).group(1)
-            online_users.remove(remove_user)
-            chat_room.update_user_list()
-            continue
+        try:
+            message = client_socket.recv(1024)
+            if update_pattern.match(message):
+                new_user = update_pattern.match(message).group(1)
+                online_users.add(new_user)
+                chat_room.update_user_list(update=new_user)
+                continue
+            elif remove_pattern.match(message):
+                remove_user = remove_pattern.match(message).group(1)
+                online_users.remove(remove_user)
+                chat_room.update_user_list()
+                continue
+            elif null_pattern.match(message):
+                continue
 
-        raw_message = message.decode('utf-8')
-        chat_room.ui.textBrowser.append(raw_message)
-        # except:
-        #     chat_room.ui.textBrowser.append(
-        #         "---------------------------   Cannot connect to the server!  ---------------------------\n")
-        #     chat_room.ui.pushButton.setEnabled(False)
-        #     client_socket.close()
-        #     break
+            raw_message = message.decode('utf-8')
+            if null_text_pattern.match(raw_message):
+                continue
+            chat_room.ui.textBrowser.append(raw_message)
+        except:
+            chat_room.ui.textBrowser.append(
+                "---------------------------   Cannot connect to the server!  ---------------------------\n")
+            chat_room.ui.pushButton.setEnabled(False)
+            client_socket.close()
+            break
 
 
 def receive_file() -> None:

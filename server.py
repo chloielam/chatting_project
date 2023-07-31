@@ -59,14 +59,12 @@ def send_to_client(client_socket, message) -> None:
         message = message + (1024-len(message))*'\x00'
         client_socket.send(message.encode('utf-8'))
     else:
-        print("fuck yeah")
         message_list = []
         while len(message) > 1024:
             message_list.append(message[:1024])
             message = message[1024:]
-        message_list.append(message + (1024-len(message))*'\x00')
-        if null_pattern.match(message_list[-1]):
-            message_list.pop()
+        if len(message):
+            message_list.append(message + (1024-len(message))*'\x00')
         for message in message_list:
             client_socket.send(message.encode('utf-8'))
 
@@ -96,11 +94,6 @@ def handle(client_socket, nickname) -> None:
         try:
             # receive message from client
             message = client_socket.recv(1024)
-            # print('---')
-            # print(message)
-            # print(len(message))
-            # print('---')
-            # private message
             if message.startswith((b'/private')):
                 private_message(client_socket, nickname, message)
                 continue
