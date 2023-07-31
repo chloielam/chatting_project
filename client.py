@@ -5,11 +5,11 @@ import threading
 import socket
 import sys
 from PySide6.QtWidgets import (QApplication, QLineEdit, QPlainTextEdit, QPushButton, QVBoxLayout,
-                               QScrollArea, QSizePolicy, QTextBrowser, QWidget, QLabel)
+                               QScrollArea, QSizePolicy, QTextBrowser, QWidget, QLabel, QListWidget, QListWidgetItem)
 from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
                            QFont, QFontDatabase, QGradient, QIcon,
                            QImage, QKeySequence, QLinearGradient, QPainter,
-                           QPalette, QPixmap, QRadialGradient, QTransform, QIntValidator, QRegularExpressionValidator)
+                           QPalette, QPixmap, QRadialGradient, QTransform, QIntValidator)
 
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
                             QMetaObject, QObject, QPoint, QRect,
@@ -254,6 +254,8 @@ class NameFormGUI(QWidget):
                 self.ui.warning_label.setText(
                     "Nickname already in use!")
                 return
+            global user_name
+            user_name = self.ui.nickname_input.text().encode('utf-8')
             chat_room.ui.textBrowser.append(message)
             chat_room.start_room()
             self.close()
@@ -289,19 +291,27 @@ class ChatRoom(object):
         self.plainTextEdit.setGeometry(QRect(10, 530, 650, 50))
         self.plainTextEdit.setFont(font)
 
-        self.scrollAreaWidgetContents = QWidget()
-        self.scrollAreaWidgetContents.setObjectName(
-            u"scrollAreaWidgetContents")
-        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 120, 500))
+        self.user_list = QListWidget(Widget)
+        self.user_list.setObjectName(
+            u"user_list")
+        self.user_list.setGeometry(QRect(0, 0, 120, 500))
 
         # SCROLL AREA
         self.scrollArea = QScrollArea(Widget)
         self.scrollArea.setObjectName(u"scrollArea")
-        self.scrollArea.setGeometry(QRect(670, 10, 120, 500))
+        self.scrollArea.setGeometry(QRect(670, 40, 120, 470))
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.scrollArea.setWidget(self.scrollAreaWidgetContents)
+        self.scrollArea.setWidget(self.user_list)
+
+        # ONLINE USERS LABEL
+        self.label = QLabel(Widget)
+        self.label.setObjectName(u"label")
+        self.label.setGeometry(QRect(670, 10, 120, 31))
+        self.label.setFont(font)
+        self.label.setText(
+            QCoreApplication.translate("Widget", u"Online Users", None))
 
         # SEND BUTTON
         self.pushButton = QPushButton(Widget)
@@ -321,6 +331,11 @@ class ChatRoom(object):
 
 
 class ChatRoomGUI(QWidget):
+    help_pattern = re.compile(r'^\s*/help\s*$')
+    quit_pattern = re.compile(r'^\s*/quit\s*$')
+    clear_pattern = re.compile(r'^\s*/clear\s*$')
+    private_pattern = re.compile(r'^\s*/private.*$')
+    null_pattern = re.compile(r'^[\s\n]*$')
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -342,32 +357,11 @@ class ChatRoomGUI(QWidget):
         )
         self.ui.pushButton.setEnabled(False)
         self.ui.scrollArea.setAlignment(Qt.AlignTop)
-        self.ui.scrollAreaWidgetContents.setLayout(QVBoxLayout())
-        self.ui.scrollAreaWidgetContents.layout().setAlignment(Qt.AlignTop)
+        self.ui.user_list.setLayout(QVBoxLayout())
+        self.ui.user_list.layout().setAlignment(Qt.AlignTop)
         self.font = QFont()
         self.font.setPointSize(13)
         self.font.setBold(True)
-
-    def update_online_users(self) -> None:
-        for i in reversed(range(self.ui.scrollAreaWidgetContents.layout().count())):
-            self.ui.scrollAreaWidgetContents.layout().itemAt(i).widget().setParent(None)
-        label = QLabel()
-        label.setObjectName(u"Users")
-        label.setText(QCoreApplication.translate("Widget", u"Online:", None))
-        label.setAlignment(Qt.AlignLeft)
-        label.setGeometry(QRect(0, 0, 120, 120))
-        label.setFont(self.font)
-        for user in online_users:
-            label = QLabel()
-            label.setObjectName(u"label")
-            label.setText(QCoreApplication.translate(
-                "Widget", f"{user}", None))
-            label.setAlignment(Qt.AlignLeft)
-            label.setGeometry(QRect(0, 0, 120, 80))
-            label.setStyleSheet(
-                u"border: 1px solid gray; text-indent: 10px; line-height: 1.5;")
-            label.setFont(self.font)
-            self.ui.scrollAreaWidgetContents.layout().addWidget(label)
 
     def eventFilter(self, watched: QObject, event: any) -> bool:
         if watched == self.ui.plainTextEdit:
@@ -383,7 +377,7 @@ class ChatRoomGUI(QWidget):
         return super().eventFilter(watched, event)
 
     def __send_message(self, message: str) -> None:
-        if re.compile(r'^\s*/help\s*$').match(message):
+        if self.help_pattern.match(message):
             self.ui.textBrowser.append(
                 "-----------------------------   List of commands   -----------------------------\n")
             self.ui.textBrowser.append(
@@ -398,17 +392,17 @@ class ChatRoomGUI(QWidget):
                 "--------------------------------------------------------------------------------\n")
             self.ui.plainTextEdit.clear()
             return
-        if re.compile(r'^\s*/quit\s*$').match(message):
+        if self.quit_pattern.match(message):
             ctypes.windll.user32.MessageBoxW(
                 0, "You have left the chatroom!", "Info", 0)
             self.close()
             client_socket.close()
             sys.exit(0)
-        if re.compile(r'^\s*/clear\s*$').match(message):
+        if self.clear_pattern.match(message):
             self.ui.textBrowser.clear()
             self.ui.plainTextEdit.clear()
             return
-        if re.compile(r'^\s*/private.*$').match(message):
+        if self.private_pattern.match(message):
             valid_private_pattern = re.compile(
                 r"^[\n\s]*(/private)\s+(\(.{2,16}\))\s+(.+)$")
             if valid_private_pattern.match(message):
@@ -432,6 +426,9 @@ class ChatRoomGUI(QWidget):
                 self.ui.textBrowser.append(
                     "---- Usage: /private (<username>) <message>\n")
                 return
+        if self.null_pattern.match(message):
+            self.ui.plainTextEdit.clear()
+            return
         send_to_server(message)
         self.ui.textBrowser.append("You: " + message)
         self.ui.plainTextEdit.clear()
@@ -444,6 +441,23 @@ class ChatRoomGUI(QWidget):
                 "---------------------------   Cannot connect to the server!  ---------------------------\n")
             self.ui.pushButton.setEnabled(False)
             client_socket.close()
+
+    def update_user_list(self, update=None) -> None:
+        if update:
+            item = QListWidgetItem(
+                update.decode('utf-8') if update != user_name else update.decode('utf-8') + " (You)")
+            item.setFont(self.font)
+            self.ui.user_list.addItem(item)
+        else:
+            self.ui.user_list.clear()
+            item = QListWidgetItem(user_name.decode('utf-8') + " (You)")
+            item.setFont(self.font)
+            self.ui.user_list.addItem(item)
+            for user in online_users:
+                item = QListWidgetItem(
+                    user.decode('utf-8') if user != user_name else user.decode('utf-8') + " (You)")
+                item.setFont(self.font)
+                self.ui.user_list.addItem(item)
 
     def start_room(self) -> None:
 
@@ -477,24 +491,35 @@ def send_to_server(message: str) -> None:
 
 
 def receive() -> None:
+    update_pattern = re.compile(rb'\x00+UPDATE \((.+)\)\x00*')
+    remove_pattern = re.compile(rb'\x00+REMOVE \((.+)\)\x00*')
+    null_pattern = re.compile(rb'\x00+')
     while True:
-        try:
-            message = client_socket.recv(1024)
-        # if message.startswith((b'UPDATE')):
-        #     print("yes")
-        #     continue
-            raw_message = message.decode('utf-8')
-        # print('---')
-        # print(raw_message)
-        # print(len(raw_message))
-        # print('---')
-            chat_room.ui.textBrowser.append(raw_message)
-        except:
-            chat_room.ui.textBrowser.append(
-                "---------------------------   Cannot connect to the server!  ---------------------------\n")
-            chat_room.ui.pushButton.setEnabled(False)
-            client_socket.close()
-            break
+        # try:
+        message = client_socket.recv(1024)
+        if null_pattern.match(message):
+            continue
+        if update_pattern.match(message):
+            new_user = update_pattern.match(message).group(1)
+            print(new_user)
+            print(new_user.decode('utf-8'))
+            online_users.add(new_user)
+            chat_room.update_user_list(update=new_user)
+            continue
+        if remove_pattern.match(message):
+            remove_user = remove_pattern.match(message).group(1)
+            online_users.remove(remove_user)
+            chat_room.update_user_list()
+            continue
+
+        raw_message = message.decode('utf-8')
+        chat_room.ui.textBrowser.append(raw_message)
+        # except:
+        #     chat_room.ui.textBrowser.append(
+        #         "---------------------------   Cannot connect to the server!  ---------------------------\n")
+        #     chat_room.ui.pushButton.setEnabled(False)
+        #     client_socket.close()
+        #     break
 
 
 def receive_file() -> None:
@@ -511,7 +536,8 @@ app = QApplication(sys.argv)
 login = ConnectFormGUI()
 name_gui = NameFormGUI()
 chat_room = ChatRoomGUI()
-online_users = {}
+online_users = set()
+user_name = b""
 
 # ----------------------------------------------------------Main----------------------------------------------------------
 if __name__ == "__main__":
