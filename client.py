@@ -446,6 +446,12 @@ class ChatRoomGUI(QWidget):
             client_socket.close()
 
     def start_room(self) -> None:
+
+        self.ui.textBrowser.append(
+            '                              ------   Welcome to the chatroom!   ------                             \n')
+        self.ui.textBrowser.append(
+            '                                ------   Type /help for more info.   ------                             \n')
+
         receive_thread = threading.Thread(target=receive)
         receive_thread.start()
         self.show()
@@ -505,7 +511,7 @@ app = QApplication(sys.argv)
 login = ConnectFormGUI()
 name_gui = NameFormGUI()
 chat_room = ChatRoomGUI()
-online_users = []
+online_users = {}
 
 # ----------------------------------------------------------Main----------------------------------------------------------
 if __name__ == "__main__":

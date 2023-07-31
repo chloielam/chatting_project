@@ -35,16 +35,6 @@ def transfer_file(sender_socket, receiver_socket, filename) -> None:
     pass
 
 
-# send welcome message to new client
-
-
-def welcome(client_socket) -> None:
-    send_to_client(
-        client_socket, '                              ------   Welcome to the chatroom!   ------                             \n')
-    send_to_client(
-        client_socket, '                                ------   Type /help for more info.   ------                             \n')
-
-
 def private_message(client_socket, nickname, message) -> None:
     structure = re.compile(r'^(/private)\s(\(.{2,16}\))\s(.+)$')
     _, receiver, text = structure.match(message.decode('utf-8')).groups()
@@ -148,14 +138,11 @@ def on_connect(client_socket, address) -> None:
         CLIENTS[storing_nickname] = (client_socket, address)
 
         # send list of clients all clients including the new one
-        # update_thread = threading.Thread(target=update_client_list)
-        # update_thread.start()
+
         # notify to all clients
         broadcast(f'{display_nickname} joined the chatroom!', "SERVER")
-        # welcome new client
-        welcome(client_socket)
 
-        # send_to_client(client_socket, 'UPDATE')
+        # send_to_client(client_socket, 'UPDATE '+f"({display_nickname})")
 
         # start thread for handling client
         thread = threading.Thread(
