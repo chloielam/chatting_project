@@ -3,6 +3,7 @@ import threading
 import ctypes
 from sortedcontainers import SortedDict
 import re
+import sys
 # CLIENT[NICKNAME] = [SOCKET, ADDRESS]
 # {bytes: [socket.socket, (str, int)]}
 CLIENTS = SortedDict()
@@ -27,6 +28,13 @@ except:
 # listen for clients
 server.listen()
 
+# transfer file from client to another client
+
+
+def transfer_file(sender_socket, receiver_socket, filename) -> None:
+    pass
+
+
 # send welcome message to new client
 
 
@@ -42,16 +50,33 @@ def private_message(client_socket, nickname, message) -> None:
     _, receiver, text = structure.match(message.decode('utf-8')).groups()
     lookup_nickname = receiver[1:-1].encode('utf-8')
     if lookup_nickname not in CLIENTS:
-        client_socket.send(
-            '————> User not found. Please try again.'.encode('utf-8'))
+        send_to_client(
+            client_socket, '————> User not found. Please try again.')
         return
-    display_nickname = nickname.decode('utf-8')
     send_to_client(CLIENTS[lookup_nickname][0],
-                   f'[Private from {display_nickname}]: {text}')
+                   f'[Private from {nickname.decode("utf-8")}]: {text}')
 
 
-def send_to_client(client_socket, message):
-    client_socket.send(message.encode('utf-8'))
+def send_to_client(client_socket, message) -> None:
+    # padding to make each message 1024 bytes
+    # if message is larger than 1024 bytes, then store the rest in a list
+    # and send the list to the client
+    # message in string format
+    # format each message to be 1024 bytes
+    # reference: https://stackoverflow.com/questions/39479036/python-make-sure-to-send-1024-bytes-at-a-time
+    if len(message) < 1024:
+        message = message + (1024-len(message))*'\x00'
+        client_socket.send(message.encode('utf-8'))
+    else:
+        message_list = []
+        while len(message) > 1024:
+            message_list.append(message[:1024])
+            message = message[1024:]
+        message_list.append(message + (1024-len(message))*'\x00')
+        if message_list[-1] == 1024 * '\x00':
+            message_list.pop()
+        for message in message_list:
+            client_socket.send(message.encode('utf-8'))
 
 
 # broadcast messages to all clients
@@ -63,15 +88,13 @@ def broadcast(message, nickname, sender=None) -> None:
         notification = (85-len(message))//2 * ' '  \
             + '-'*6 + "   " + message + "   " + '-' * \
             6 + (85-len(message))//2 * ' '+'\n'
-        notification = notification.encode('utf-8')
         for client_socket, address in CLIENTS.values():
-            client_socket.send(notification)
+            send_to_client(client_socket, notification)
     else:
         for client_socket, address in CLIENTS.values():
             if client_socket is not sender:
-                display_nickname = nickname.decode('utf-8')
-                client_socket.send(
-                    f'[{display_nickname}]: '.encode('utf-8') + message)
+                send_to_client(client_socket,
+                               f'[{nickname.decode("utf-8")}]: {message.decode("utf-8")}')
 
 # handle client messages
 
@@ -81,6 +104,10 @@ def handle(client_socket, nickname) -> None:
         try:
             # receive message from client
             message = client_socket.recv(1024)
+            # print('---')
+            # print(message)
+            # print(len(message))
+            # print('---')
             # private message
             if message.startswith((b'/private')):
                 private_message(client_socket, nickname, message)
@@ -91,14 +118,20 @@ def handle(client_socket, nickname) -> None:
             # remove client from CLIENTS
             del CLIENTS[nickname]
             # notify to all clients
-            broadcast(f'{nickname} left the chatroom!', "SERVER")
+            broadcast(
+                f'{nickname.decode("utf-8")} left the chatroom!', "SERVER")
+            # update_thread = threading.Thread(target=update_client_list)
+            # update_thread.start()
             break
 
 
 # handle new connections
+# def update_client_list() -> None:
+#     for client_socket, address in CLIENTS.values():
+#         send_to_client(client_socket, 'UPDATE'+f" {[key.decode('utf-8') for key in CLIENTS.keys()]}")
 
 
-def on_connect(client_socket, address: tuple) -> None:
+def on_connect(client_socket, address) -> None:
     # request and store nickname
     try:
         storing_nickname = client_socket.recv(1024)  # bytes
@@ -113,10 +146,17 @@ def on_connect(client_socket, address: tuple) -> None:
 
         # store client information
         CLIENTS[storing_nickname] = (client_socket, address)
+
+        # send list of clients all clients including the new one
+        # update_thread = threading.Thread(target=update_client_list)
+        # update_thread.start()
         # notify to all clients
         broadcast(f'{display_nickname} joined the chatroom!', "SERVER")
         # welcome new client
         welcome(client_socket)
+
+        # send_to_client(client_socket, 'UPDATE')
+
         # start thread for handling client
         thread = threading.Thread(
             target=handle, args=(client_socket, storing_nickname))
