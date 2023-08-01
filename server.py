@@ -9,24 +9,33 @@ import sys
 CLIENTS = SortedDict()
 
 # create a socket object
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-# server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # allow reuse of address
+chat_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# chat_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
 
 # get local machine name
-host = socket.gethostname()
-port = 9999
+CHAT_HOST = socket.gethostname()
+CHAT_PORT = 9999
 
 
-# bind to the port
-# allow only one instance of the server to run
+file_transfer_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# file_transfer_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+FILE_HOST = socket.gethostname()
+FILE_PORT = 8080
+
+
+# allow only one instance of the chat_server to run
 try:
-    server.bind((host, port))
+    chat_server.bind((CHAT_HOST, CHAT_PORT))
+    file_transfer_server.bind((FILE_HOST, FILE_PORT))
 except:
     ctypes.windll.user32.MessageBoxW(
         0, "Another instance of the server is already running!", "Error", 1)
     sys.exit(0)
 # listen for clients
-server.listen()
+chat_server.listen()
+file_transfer_server.listen()
 
 # transfer file from client to another client
 
@@ -54,7 +63,6 @@ def send_to_client(client_socket, message) -> None:
     # message in string format
     # format each message to be 1024 bytes
     # reference: https://stackoverflow.com/questions/39479036/python-make-sure-to-send-1024-bytes-at-a-time
-    null_pattern = re.compile(r'\x00+$')
     if len(message) < 1024:
         message = message + (1024-len(message))*'\x00'
         client_socket.send(message.encode('utf-8'))
@@ -163,7 +171,7 @@ def on_connect(client_socket, address) -> None:
 def accept() -> None:
     while True:
         try:
-            client_socket, address = server.accept()
+            client_socket, address = chat_server.accept()
             print(f'Connected with {str(address)}')
             thread = threading.Thread(
                 target=on_connect, args=(client_socket, address))
@@ -181,7 +189,7 @@ if __name__ == '__main__':
 
     def on_closing():
         root.destroy()
-        server.close()
+        chat_server.close()
         sys.exit(0)
 
     root.protocol("WM_DELETE_WINDOW", on_closing)
@@ -192,9 +200,9 @@ if __name__ == '__main__':
     # set the title
     root.title("SERVER IS ONLINE!")
     root.resizable(False, False)
-    # display host and port on tkinter windows (centered)
-    tk.Label(root, text=f"HOST: {host}").pack(pady=10)
-    tk.Label(root, text=f"PORT: {port}").pack(pady=10)
+    # display CHAT_HOST and CHAT_PORT on tkinter windows (centered)
+    tk.Label(root, text=f"HOST: {CHAT_HOST}").pack(pady=10)
+    tk.Label(root, text=f"PORT: {CHAT_PORT}").pack(pady=10)
 
     # start accepting clients
     accept_thread = threading.Thread(target=accept)

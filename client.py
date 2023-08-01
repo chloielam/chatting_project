@@ -363,6 +363,11 @@ class ChatRoomGUI(QWidget):
         self.font.setPointSize(13)
         self.font.setBold(True)
 
+        self.ui.user_list.itemClicked.connect(
+            lambda item: self.ui.plainTextEdit.setPlainText(
+                f"/private ({item.text()}) ")
+            if item.text() != user_name.decode('utf-8') + " (You)" else None)
+
     def eventFilter(self, watched: QObject, event: any) -> bool:
         if watched == self.ui.plainTextEdit:
             # if single Enter key is pressed, send message
