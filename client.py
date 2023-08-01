@@ -126,6 +126,7 @@ class ConnectFormGUI(QWidget):
         self.setFixedSize(self.size())
 
         # set default value for host and port
+        self.ui.host_input.setText("Z-DESKTOP")
         self.ui.port_input.setText("9999")
 
     def connect(self):
