@@ -125,8 +125,7 @@ class ConnectFormGUI(QWidget):
         # restrict resizing windows
         self.setFixedSize(self.size())
 
-        # testing purpose
-        self.ui.host_input.setText("Z-DESKTOP")
+        # set default value for host and port
         self.ui.port_input.setText("9999")
 
     def connect(self):
@@ -535,6 +534,8 @@ def send_file() -> None:
 
 # ------------------------------------------------------Global Variables-------------------------------------------------------
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+file_transfer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+FILE_PORT = 8080
 app = QApplication(sys.argv)
 login = ConnectFormGUI()
 name_gui = NameFormGUI()
