@@ -1,5 +1,5 @@
-# Tiem_Net_Hoang_Gia
-Nơi gáy dơ cùng các bờ rồ trong mạng LAN
+# Computer Network Project
+Create a chatting platform within LAN using socket interface.
 
 USAGE
 
